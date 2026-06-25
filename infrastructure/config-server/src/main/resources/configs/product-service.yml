@@ -1,0 +1,7 @@
+# product-service.yml
+# Served by Config Server to Product Service at startup.
+# This is the "Factor 3: Config" externalization point — Product Service does
+# NOT hardcode this in its own application.yml.
+
+app:
+  source: "config-server"   # marker so trainees can confirm remote config was actually loaded

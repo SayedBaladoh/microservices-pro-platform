@@ -1,0 +1,39 @@
+name: Session 1 Validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/product-service/**'
+      - 'infrastructure/eureka-server/**'
+      - 'infrastructure/config-server/**'
+  pull_request:
+    paths:
+      - 'services/product-service/**'
+      - 'infrastructure/eureka-server/**'
+      - 'infrastructure/config-server/**'
+
+jobs:
+  test-product-service:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Run Product Service unit tests
+        working-directory: services/product-service
+        run: mvn -B test
+
+      - name: Verify Eureka Server builds
+        working-directory: infrastructure/eureka-server
+        run: mvn -B compile
+
+      - name: Verify Config Server builds
+        working-directory: infrastructure/config-server
+        run: mvn -B compile

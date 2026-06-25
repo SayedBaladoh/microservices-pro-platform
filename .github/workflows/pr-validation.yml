@@ -1,0 +1,50 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate-commit-messages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check commit message format (session-NN: ...)
+        run: |
+          git log --pretty=format:"%s" origin/main..HEAD | while read -r msg; do
+            if ! echo "$msg" | grep -qE "^session-[0-9]{2}: "; then
+              echo "::error::Commit message does not match 'session-NN: short-description' format: $msg"
+              exit 1
+            fi
+          done
+
+  test-all-modules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Test product-service
+        working-directory: services/product-service
+        run: mvn -B test
+
+      - name: Test api-gateway
+        working-directory: infrastructure/api-gateway
+        run: mvn -B test
+
+      - name: Compile eureka-server
+        working-directory: infrastructure/eureka-server
+        run: mvn -B compile
+
+      - name: Compile config-server
+        working-directory: infrastructure/config-server
+        run: mvn -B compile

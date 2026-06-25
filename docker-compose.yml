@@ -1,0 +1,29 @@
+# docker-compose.yml
+# Sessions 1-2 ONLY.
+#
+# This repository follows OBG-001 (Curriculum Leakage Rule) strictly:
+# infrastructure is only added to this file in the session that teaches it.
+# Kafka, Redis, and Zipkin do NOT belong here yet — they arrive in
+# Session 7, Session 8, and the Observability phase respectively.
+#
+# Only PostgreSQL is containerized here. Eureka Server, Config Server,
+# API Gateway, and Product Service all run directly on your machine via
+# `mvn spring-boot:run` (or your IDE) through Session 8 — see
+# docs/setup/local-setup.md. Containerizing the Spring Boot services
+# themselves (Dockerfile per service) is Session 9 — do not add it early.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: microservices_pro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

@@ -1,0 +1,30 @@
+# application.yml — Config Server
+# Session 1 — Architecture & Spring Cloud
+#
+# NOTE on backend choice: the Session 1 instructor script demos a git-backed
+# Config Server (uri: file://${user.home}/config-repo) as the "production-realistic"
+# option. For this repository we use the "native" backend instead — it serves
+# config straight from this server's own classpath (see
+# src/main/resources/configs/), so trainees don't need a second git repo just
+# to run Session 1-2. Switching to a git-backed repo is a documented homework/
+# Phase-2 upgrade, not a missing feature.
+
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-server
+  profiles:
+    active: native
+  cloud:
+    config:
+      server:
+        native:
+          search-locations: classpath:/configs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,env

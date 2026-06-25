@@ -1,0 +1,5 @@
+# api-gateway.yml
+# Served by Config Server to API Gateway at startup (Session 2).
+
+app:
+  source: "config-server"
