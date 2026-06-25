@@ -16,7 +16,7 @@ quick-reference for this repository specifically.
 ## Clone and verify
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/microservices-pro-platform.git
+git clone https://github.com/SayedBaladoh/microservices-pro-platform.git
 cd microservices-pro-platform
 ls -la
 # You should see: docker-compose.yml, infrastructure/, services/, docs/

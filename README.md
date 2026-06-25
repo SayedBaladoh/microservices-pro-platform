@@ -28,7 +28,7 @@ them — see `docs/architecture/platform-overview.md`.
 1. **Fork** this repository to your own GitHub account.
 2. **Clone** your fork locally:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/microservices-pro-platform.git
+   git clone https://github.com/SayedBaladoh/microservices-pro-platform.git
    cd microservices-pro-platform
    ```
 3. **Lab** — open the lab for the current session in `docs/labs/` and
