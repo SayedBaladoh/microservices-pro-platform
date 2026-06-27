@@ -1,17 +1,16 @@
-# Microservices Professional Platform
+# microservices-pro-platform
 
 **Microservices Course — Spring Boot & Spring Cloud, Professional Edition**
-
 
 This is the **Enterprise E-Commerce Platform** — the one system you build,
 session after session, from Session 1 to Session 29. There are no
 disconnected practice exercises here: every lab adds a real capability to
 this real platform.
 
-**Current scope of this repository: Sessions 1–2.** Services and
+**Current scope of this repository: Sessions 1–3.** Services and
 infrastructure for later sessions (Order, Payment, Inventory, Notification,
-Kafka, Redis, Kubernetes, etc.) are added only in the session that teaches
-them — see `docs/architecture/platform-overview.md`.
+Kafka, Kubernetes, etc.) are added only in the session that teaches them —
+see `docs/architecture/platform-overview.md`.
 
 ---
 
@@ -22,7 +21,12 @@ them — see `docs/architecture/platform-overview.md`.
 | `infrastructure/eureka-server` | 8761 | Session 1 | Service discovery registry |
 | `infrastructure/config-server` | 8888 | Session 1 | Centralized configuration |
 | `services/product-service` | 8081 | Session 1 | Product catalogue REST API |
-| `infrastructure/api-gateway` | 8080 | Session 2 | Single entry point, routing |
+| `infrastructure/api-gateway` | 8080 | Session 2-3 | Single entry point, routing, JWT auth, rate limiting |
+
+`tools/jwt-generator` also exists, but it is **not a platform service** —
+it's a CLI you run manually to produce test JWTs for Session 3 labs. See
+`docs/labs/session-03-jwt-testing.md`. It will be replaced by a real
+Identity Provider in Session 20.
 
 ## How you work in this repository
 
@@ -109,4 +113,4 @@ Tests 20% / Code Quality 10%.
 
 ---
 
-*Elsayed Baladoh · microservices-pro-platform*
+*Dr.Sayed Baladoh · microservices-pro-platform*

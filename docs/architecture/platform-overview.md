@@ -1,4 +1,4 @@
-# Platform Overview — As of Session 2
+# Platform Overview — As of Session 3
 
 This document reflects **only what has been built so far** in this
 repository. It is not the full 29-session platform roadmap (that lives in
@@ -11,10 +11,13 @@ session that adds something new.
                     ┌──────────────────────┐
                     │   CLIENT (Postman)   │
                     └──────────┬───────────┘
-                               │ HTTP
+                               │ HTTP (+ JWT for protected routes)
                                ▼
                     ┌──────────────────────┐
-                    │     API GATEWAY      │   :8080   (Session 2)
+                    │     API GATEWAY      │   :8080   (Session 2-3)
+                    │  LoggingFilter        │
+                    │  JwtAuthFilter        │   (Session 3)
+                    │  RequestRateLimiter   │   (Session 3)
                     │  Route: /api/v1/      │
                     │  products/** →        │
                     │  lb://PRODUCT-SERVICE │
@@ -36,6 +39,14 @@ session that adds something new.
                     │  serves config to all │
                     │  services above        │
                     └──────────────────────┘
+
+                    ┌──────────────────────┐
+                    │        REDIS         │   :6379   (Session 3)
+                    │  RequestRateLimiter   │
+                    │  token bucket store   │
+                    │  (NOT caching yet —    │
+                    │   that's Session 8)    │
+                    └──────────────────────┘
 ```
 
 ## Services
@@ -45,7 +56,19 @@ session that adds something new.
 | Config Server | 8888 | Session 1 | Spring Cloud Config (native backend) | ✅ |
 | Eureka Server | 8761 | Session 1 | Spring Cloud Netflix Eureka | ✅ |
 | Product Service | 8081 | Session 1 | Spring Boot, in-memory store | ✅ |
-| API Gateway | 8080 | Session 2 | Spring Cloud Gateway + WebFlux | ✅ |
+| API Gateway | 8080 | Session 2-3 | Spring Cloud Gateway + WebFlux, JWT + Rate Limiting | ✅ |
+| Redis | 6379 | Session 3 | Rate limiter token bucket store | ✅ |
+
+## A tool, not a service: `tools/jwt-generator`
+
+This repository also contains `tools/jwt-generator` — a standalone CLI used
+to produce test JWTs during Session 3 labs. **It is deliberately not listed
+in the table above.** It is not a platform service: it isn't in
+`docker-compose.yml`, isn't built or tested by any CI workflow, and the
+platform does not depend on it being available at runtime. It exists only
+to simulate an Identity Provider during training and will be deleted (not
+upgraded) when Session 20 introduces a real one (Keycloak/OAuth2). See
+`docs/labs/session-03-jwt-testing.md`.
 
 ## What is deliberately NOT here yet
 
@@ -54,11 +77,11 @@ repository until the session listed actually happens.
 
 | Not yet present | Arrives in |
 |---|---|
-| JWT auth, rate limiting on the Gateway | Session 3 |
+| Real Identity Provider (Keycloak/OAuth2), login/token-issuance endpoint | Session 20 |
 | Order Service, Payment Service | Session 4 |
 | Inventory Service, OpenFeign calls | Session 6 |
 | Kafka, Saga pattern, Notification Service | Session 7 |
-| Redis, caching | Session 8 |
+| Redis response caching (@Cacheable) on Product Service | Session 8 |
 | Dockerfiles for the Spring Boot services, full containerization | Session 9 |
 | Kubernetes, CI/CD, GitOps | Sessions 13–16 |
 

@@ -22,6 +22,16 @@ Common issues for Sessions 1–2, taken directly from the Session Pack
 | `lb://` URI causes `NoRouteToHostException` | The service name in the URI (`PRODUCT-SERVICE`) must match the Eureka registration name exactly (case-insensitive by default). |
 | `LoggingFilter` not printing logs | Check your log level — add `logging.level.com.microservices.pro=DEBUG` to `application.yml` if needed. |
 
+## Session 3 — JWT Auth Filter & Rate Limiting
+
+| Issue | Solution |
+|---|---|
+| `IllegalStateException: No KeyResolver bean` | Add `@Primary` to your main `KeyResolver` bean in `RateLimitConfig`. Spring cannot choose between multiple `KeyResolver` beans without it. |
+| Rate limiter not triggering (always 200) | Check Redis is running: `docker compose ps`. Also verify `redis-rate-limiter.*` keys are correctly indented under the `RequestRateLimiter` filter in `application.yml`. |
+| Every valid-looking token returns 401 | Your `jwt-generator` secret and the Gateway's `jwt.secret` don't match. Set `JWT_SECRET` identically in both terminals — see `docs/labs/session-03-jwt-testing.md`. |
+| `JwtException: JWT strings must contain exactly 2 period characters` | Token is malformed — usually a missing `Bearer ` prefix strip. Confirm `token = authHeader.substring(7)`. |
+| Public route returning 401 | Check `isPublicRoute()` uses `path.startsWith()`, not `path.equals()` — the path may include trailing segments. |
+
 ## Still stuck?
 
 Compare your code against the `reference` branch (see
