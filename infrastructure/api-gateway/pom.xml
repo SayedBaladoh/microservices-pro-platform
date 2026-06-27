@@ -18,9 +18,9 @@
     <description>
         API Gateway — Session 2. Single entry point for the platform.
 
-        CRITICAL: this module must NEVER depend on spring-boot-starter-web.
+        CRITICAL: this module must NEVER depend on spring -boot-starter-web.
         Spring Cloud Gateway is built on WebFlux (reactive, non-blocking).
-        Adding spring-boot-starter-web (Servlet stack) alongside it causes
+        Adding spring -boot-starter-web (Servlet stack) alongside it causes
         an immediate startup conflict — see Session 2 docx, "Common Issues
         &amp; Solutions" table, and Session 2 Daily Quiz Q4/Q5.
     </description>
