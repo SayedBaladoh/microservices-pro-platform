@@ -19,8 +19,11 @@ import java.util.List;
 @org.springframework.stereotype.Component
 public class JwtAuthFilter implements GlobalFilter, Ordered {
 
-    // TODO 1: Define PUBLIC_ROUTES list (at minimum: "/api/v1/products" — GET all is public)
-    private static final List<String> PUBLIC_ROUTES = List.of();
+    private final AntPathMatcher pathMatcher = new AntPathMatcher();    
+    private record PublicRoute(HttpMethod method, String pathPattern) {}
+
+    // TODO 1: Define PUBLIC_ROUTES list (at minimum: GET "/api/v1/products/**" — GET all and get by Id is public)
+    private static final List<PublicRoute> PUBLIC_ROUTES = List.of();
 
     @Autowired
     private JwtUtil jwtUtil;
@@ -28,7 +31,7 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         // TODO 2: Implement filter() method:
-        //   - Skip validation for public routes (path::startsWith, not equals)
+        //   - Skip validation for public routes
         //   - Extract the Authorization header, expect "Bearer <token>"
         //   - Return 401 if missing or invalid
         //   - Validate the JWT via jwtUtil
