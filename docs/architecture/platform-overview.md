@@ -1,4 +1,4 @@
-# Platform Overview — As of Session 3
+# Platform Overview — As of Session 5
 
 This document reflects **only what has been built so far** in this
 repository. It is not the full 29-session platform roadmap (that lives in
@@ -16,8 +16,8 @@ session that adds something new.
                     ┌──────────────────────┐
                     │     API GATEWAY      │   :8080   (Session 2-3)
                     │  LoggingFilter        │
-                    │  JwtAuthFilter        │   (Session 3)
-                    │  RequestRateLimiter   │   (Session 3)
+                    │  JwtAuthFilter        │
+                    │  RequestRateLimiter   │
                     │  Route: /api/v1/      │
                     │  products/** →        │
                     │  lb://PRODUCT-SERVICE │
@@ -30,9 +30,19 @@ session that adds something new.
                     └──────────┬───────────┘
                                │ registers with
                                ▼
-                    ┌──────────────────────┐
-                    │    EUREKA SERVER     │   :8761   (Session 1)
-                    └──────────────────────┘
+                    ┌──────────────────────┐         ┌──────────────────────┐
+                    │    EUREKA SERVER     │         │    ORDER SERVICE     │   :8082   (S4-5)
+                    │        :8761          │◄────────┤  Bulkhead             │
+                    └──────────────────────┘         │  TimeLimiter          │
+                               ▲                      │  CircuitBreaker       │
+                               │ registers             │  Retry                │
+                    ┌──────────────────────┐         │  → in-process          │
+                    │   PAYMENT SERVICE    │         │    PaymentService stub │
+                    │        :8083          │         │  (NOT a network call  │
+                    │  (S4) random failures │         │   to the real Payment │
+                    │  (S5) optional delay  │         │   Service — see note  │
+                    └──────────────────────┘         │   in OrderService)     │
+                                                       └──────────────────────┘
 
                     ┌──────────────────────┐
                     │    CONFIG SERVER     │   :8888   (Session 1)
@@ -49,6 +59,17 @@ session that adds something new.
                     └──────────────────────┘
 ```
 
+## A note on Order Service → Payment Service in this scope
+
+`services/payment-service` is a real, independently running, Eureka-registered
+microservice from Session 4 onward — but `OrderService` (inside
+`order-service`) does **not** call it over HTTP yet. It calls an in-process
+`PaymentService` bean that lives inside `order-service` itself and simulates
+the same random-failure behavior locally. Real inter-service HTTP calls
+(OpenFeign) arrive in Session 6 — wiring that early would be exactly the
+kind of curriculum leakage OBG-001 exists to prevent. See the header
+comment on `order-service/.../PaymentService.java` for the full rationale.
+
 ## Services
 
 | Service | Port | Added | Tech | Status |
@@ -58,6 +79,8 @@ session that adds something new.
 | Product Service | 8081 | Session 1 | Spring Boot, in-memory store | ✅ |
 | API Gateway | 8080 | Session 2-3 | Spring Cloud Gateway + WebFlux, JWT + Rate Limiting | ✅ |
 | Redis | 6379 | Session 3 | Rate limiter token bucket store | ✅ |
+| Payment Service | 8083 | Session 4 | Spring Boot, configurable failure rate + delay | ✅ |
+| Order Service | 8082 | Session 4-5 | Spring Boot, full Resilience4j stack | ✅ |
 
 ## A tool, not a service: `tools/jwt-generator`
 
@@ -77,8 +100,8 @@ repository until the session listed actually happens.
 
 | Not yet present | Arrives in |
 |---|---|
+| Order Service calling the REAL Payment Service over HTTP (OpenFeign) | Session 6 |
 | Real Identity Provider (Keycloak/OAuth2), login/token-issuance endpoint | Session 20 |
-| Order Service, Payment Service | Session 4 |
 | Inventory Service, OpenFeign calls | Session 6 |
 | Kafka, Saga pattern, Notification Service | Session 7 |
 | Redis response caching (@Cacheable) on Product Service | Session 8 |
