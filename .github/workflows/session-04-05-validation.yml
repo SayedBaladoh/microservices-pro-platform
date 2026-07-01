@@ -1,0 +1,81 @@
+name: Session 4-5 Validation
+
+# Why one shared workflow for two sessions: Session 5 does not introduce a
+# new module — it modifies the same order-service and payment-service files
+# Session 4 created (adding Bulkhead + TimeLimiter on top of CircuitBreaker +
+# Retry). A second, separately-named workflow would run the identical
+# `mvn test` command against the identical modules with no real
+# distinction between "Session 4's version" and "Session 5's version" (only
+# one version exists in the repo at any time). Compare this to
+# session-02/session-03-validation.yml, which legitimately differ because
+# api-gateway existed in two meaningfully different states across those
+# two sessions while both workflow files were live.
+#
+# NOTE FOR FUTURE SESSIONS (read this before editing, especially at
+# Session 6+): this workflow currently covers ALL of order-service's and
+# payment-service's resilience-pattern scope (S4: CircuitBreaker, Retry —
+# S5: Bulkhead, TimeLimiter). When Session 6 adds OpenFeign / Inventory
+# Service calls to order-service, that is NEW scope for that module and
+# should get its own session-06-validation.yml — do not silently fold
+# Session 6 changes into this file just because it also touches
+# order-service.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/order-service/**'
+      - 'services/payment-service/**'
+  pull_request:
+    paths:
+      - 'services/order-service/**'
+      - 'services/payment-service/**'
+
+jobs:
+  test-order-service-resilience-stack:
+    name: "order-service: CircuitBreaker + Retry + Bulkhead + TimeLimiter (S4-S5 scope)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Guard — fail fast if spring-boot-starter-aop is missing
+        run: |
+          if ! grep -q "spring-boot-starter-aop" services/order-service/pom.xml; then
+            echo "::error::services/order-service/pom.xml is missing spring-boot-starter-aop. Resilience4j's @CircuitBreaker/@Retry/@Bulkhead/@TimeLimiter annotations require Spring AOP — without it they are silently ignored at runtime."
+            exit 1
+          fi
+
+      - name: Run order-service unit tests
+        working-directory: services/order-service
+        run: mvn -B test
+
+  test-payment-service-builds:
+    name: "payment-service: configurable failure rate + delay (S4-S5 scope)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Guard — payment-service must stay on the Servlet stack, not WebFlux
+        run: |
+          if grep -q "spring-boot-starter-webflux" services/payment-service/pom.xml; then
+            echo "::error::services/payment-service/pom.xml contains spring-boot-starter-webflux. Payment Service is a plain blocking service in this scope — it should depend on spring-boot-starter-web, not WebFlux."
+            exit 1
+          fi
+
+      - name: Compile payment-service
+        working-directory: services/payment-service
+        run: mvn -B compile
