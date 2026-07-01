@@ -32,6 +32,26 @@ Common issues for Sessions 1–2, taken directly from the Session Pack
 | `JwtException: JWT strings must contain exactly 2 period characters` | Token is malformed — usually a missing `Bearer ` prefix strip. Confirm `token = authHeader.substring(7)`. |
 | Public route returning 401 | Check `isPublicRoute()` uses `path.startsWith()`, not `path.equals()` — the path may include trailing segments. |
 
+## Session 4 — Circuit Breaker & Retry
+
+| Issue | Solution |
+|---|---|
+| `@CircuitBreaker` annotation has no effect | Missing `spring-boot-starter-aop` dependency in `order-service/pom.xml`. AOP is required for Resilience4j annotations to work — see the critical note at the top of that `pom.xml`. |
+| Fallback method never called | Fallback signature mismatch. Must have the same params as the original method PLUS `Throwable` (or the specific exception type) as the last param. Method must be in the same class. |
+| CB never opens (always `CLOSED`) | `sliding-window-size` too large relative to your test requests. Try `sliding-window-size: 5` and `failure-rate-threshold: 50` for a faster demo. |
+| Retry not visible in logs | Add `RetryLogger` (already provided in this repo) — or verify `resilience4j.retry` instance name matches `@Retry`'s `name` exactly (`paymentService`). |
+| `404` on `/actuator/circuitbreakers` | Add `management.endpoints.web.exposure.include: health,circuitbreakers` to `application.yml` (already present in this repo's shipped config). |
+
+## Session 5 — Bulkhead & TimeLimiter
+
+| Issue | Solution |
+|---|---|
+| TimeLimiter not triggering on slow payment | Verify `cancel-running-future: true`. Also ensure the method returns `CompletableFuture<...>` — not a regular synchronous return type. |
+| `timeoutFallback()` not being called | Fallback return type must be `CompletableFuture<OrderResponse>` — not just `OrderResponse`. Must match the annotated method exactly. |
+| Bulkhead never triggers (always passes through) | `max-wait-duration: 0ms` required. Without it, the default is to wait indefinitely — same as having no Bulkhead at all. |
+| `BulkheadFullException` not caught by CB | Bulkhead and CircuitBreaker have separate fallbacks. `BulkheadFullException` is caught by `bulkheadFallback()` — it does not propagate to `paymentFallback()`. |
+| Concurrent test not triggering Bulkhead | Your HTTP client may be serializing requests. Use a script with background `&` jobs (as in `docs/labs/session-05-lab-3b.md`) for true concurrency. |
+
 ## Still stuck?
 
 Compare your code against the `reference` branch (see
