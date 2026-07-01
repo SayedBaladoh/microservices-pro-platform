@@ -1,0 +1,68 @@
+# application.yml — Order Service
+# Session 4 — adds: resilience4j.circuitbreaker, resilience4j.retry
+# Session 5 — adds: resilience4j.bulkhead, resilience4j.timelimiter
+#
+# This is the final, merged configuration — all four Resilience4j patterns
+# configured together, as they are applied together on createOrderAsync().
+
+server:
+  port: 8082
+
+spring:
+  application:
+    name: order-service
+  config:
+    import: "optional:configserver:http://localhost:8888"
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+management:
+  health:
+    circuitbreakers:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,circuitbreakers,bulkheads,retries
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      paymentService:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10          # track last 10 calls
+        failure-rate-threshold: 50        # open if 50%+ fail
+        wait-duration-in-open-state: 5s  # wait 5s before HALF-OPEN
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        register-health-indicator: true  # expose via Actuator
+
+  retry:
+    instances:
+      paymentService:
+        max-attempts: 3             # try 3 times total
+        wait-duration: 500ms        # wait 500ms between attempts
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2  # 500ms → 1s → 2s
+        retry-exceptions:
+          - java.lang.RuntimeException   # only retry on these
+        ignore-exceptions:
+          - java.lang.IllegalArgumentException  # never retry on these
+
+  # Session 5 — added below
+  bulkhead:
+    instances:
+      paymentService:
+        max-concurrent-calls: 10    # max 10 simultaneous calls to Payment
+        max-wait-duration: 0ms      # do NOT wait — fail immediately if full
+
+  timelimiter:
+    instances:
+      paymentService:
+        timeout-duration: 2s         # fail if Payment takes > 2 seconds
+        cancel-running-future: true  # cancel the thread on timeout

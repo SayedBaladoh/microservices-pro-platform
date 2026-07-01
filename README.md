@@ -1,16 +1,17 @@
 # microservices-pro-platform
 
 **Microservices Course — Spring Boot & Spring Cloud, Professional Edition**
+ITSharks · IT Learning & Training Center
 
 This is the **Enterprise E-Commerce Platform** — the one system you build,
 session after session, from Session 1 to Session 29. There are no
 disconnected practice exercises here: every lab adds a real capability to
 this real platform.
 
-**Current scope of this repository: Sessions 1–3.** Services and
-infrastructure for later sessions (Order, Payment, Inventory, Notification,
-Kafka, Kubernetes, etc.) are added only in the session that teaches them —
-see `docs/architecture/platform-overview.md`.
+**Current scope of this repository: Sessions 1–5.** Services and
+infrastructure for later sessions (Inventory, Notification, Kafka,
+Kubernetes, etc.) are added only in the session that teaches them — see
+`docs/architecture/platform-overview.md`.
 
 ---
 
@@ -22,6 +23,8 @@ see `docs/architecture/platform-overview.md`.
 | `infrastructure/config-server` | 8888 | Session 1 | Centralized configuration |
 | `services/product-service` | 8081 | Session 1 | Product catalogue REST API |
 | `infrastructure/api-gateway` | 8080 | Session 2-3 | Single entry point, routing, JWT auth, rate limiting |
+| `services/payment-service` | 8083 | Session 4 | Unstable payment callee (configurable failure rate + delay) |
+| `services/order-service` | 8082 | Session 4-5 | Full Resilience4j stack: Bulkhead, TimeLimiter, CircuitBreaker, Retry |
 
 `tools/jwt-generator` also exists, but it is **not a platform service** —
 it's a CLI you run manually to produce test JWTs for Session 3 labs. See
@@ -33,7 +36,7 @@ Identity Provider in Session 20.
 1. **Fork** this repository to your own GitHub account.
 2. **Clone** your fork locally:
    ```bash
-   git clone https://github.com/SayedBaladoh/microservices-pro-platform.git
+   git clone https://github.com/YOUR_USERNAME/microservices-pro-platform.git
    cd microservices-pro-platform
    ```
 3. **Lab** — open the lab for the current session in `docs/labs/` and
@@ -113,4 +116,4 @@ Tests 20% / Code Quality 10%.
 
 ---
 
-*Dr.Sayed Baladoh · microservices-pro-platform*
+*Dr. Sayed Baladoh ·microservices-pro-platform*
