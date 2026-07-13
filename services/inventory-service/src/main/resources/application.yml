@@ -1,0 +1,42 @@
+# application.yml — Inventory Service
+# Session 6 — port, Eureka, Config Server
+# Session 7 — adds: spring.kafka
+
+server:
+  port: 8084
+
+spring:
+  application:
+    name: inventory-service
+  config:
+    import: "optional:configserver:http://localhost:8888"
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: ${spring.application.name}  # default group; specific @KafkaListeners
+                                              # override with their own groupId where
+                                              # the docx requires a DIFFERENT group
+                                              # (e.g. inventory-compensation) — see
+                                              # InventorySagaHandler.java
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.microservices.pro.*"
+      auto-offset-reset: earliest   # if new consumer, read from beginning
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

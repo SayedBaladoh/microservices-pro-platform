@@ -8,6 +8,7 @@ import io.github.resilience4j.timelimiter.annotation.TimeLimiter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.lang.reflect.Method;
@@ -16,9 +17,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
- * OrderServiceTest — Session 4, Lab 3A, Task 4 + Session 5, Lab 3B, Task 3.
+ * OrderServiceTest — Session 4, Lab 3A, Task 4 + Session 5, Lab 3B, Task 3
+ * + Session 6, Lab 4A bonus ("OrderService integration test with mock Feign").
  *
  * Session 4 tests (1-2, adapted to this repo's merged async method):
  *   - paymentFallback() returns a PENDING status response
@@ -30,17 +35,33 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   - all four annotations (@Bulkhead, @TimeLimiter, @CircuitBreaker, @Retry)
  *     are present on createOrderAsync() — verified via reflection
  *
- * No PaymentService mocking is needed here: every test below calls a
- * fallback method directly (the documented Lab 3A/3B testing strategy),
- * not createOrderAsync() itself — so @InjectMocks just gives each test a
- * fresh OrderService; there's nothing to @Mock since PaymentService is
- * never invoked by these tests.
+ * Session 6 test (6):
+ *   - createOrder() returns REJECTED when the mocked InventoryClient
+ *     reports available=false — and never reaches Kafka/the repository,
+ *     confirming the pre-check short-circuits before any Order is saved
+ *     or any event is published.
+ *
+ * The Session 4/5 tests below need no PaymentService mocking (they call
+ * fallback methods directly), so @InjectMocks alone is fine for them.
+ * The new Session 6 test mocks InventoryClient/OrderRepository/KafkaTemplate
+ * because createOrder() is a different method that uses those collaborators
+ * — Mockito injects whichever @Mock fields match by type, leaving
+ * PaymentService as a plain (non-mocked, unused-by-this-test) field.
  */
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
 
     @InjectMocks
     private OrderService orderService;
+
+    @Mock
+    private InventoryClient inventoryClient;
+
+    @Mock
+    private OrderRepository orderRepository;
+
+    @Mock
+    private org.springframework.kafka.core.KafkaTemplate<String, Object> kafkaTemplate;
 
     // ── Session 4 ───────────────────────────────────────────────────────
 
@@ -107,5 +128,23 @@ class OrderServiceTest {
         assertThat(method.getAnnotation(TimeLimiter.class).name()).isEqualTo("paymentService");
         assertThat(method.getAnnotation(CircuitBreaker.class).name()).isEqualTo("paymentService");
         assertThat(method.getAnnotation(Retry.class).name()).isEqualTo("paymentService");
+    }
+
+    // ── Session 6 ───────────────────────────────────────────────────────
+
+    @Test
+    void createOrder_returnsRejected_whenInventoryReportsUnavailable_andNeverTouchesKafkaOrRepository() {
+        OrderRequest request = new OrderRequest("PROD-003", 1, new BigDecimal("50.00"), "cust-1");
+        when(inventoryClient.checkStock("PROD-003", 1))
+                .thenReturn(new StockCheckResponse("PROD-003", 1, false, 0));
+
+        OrderResponse response = orderService.createOrder(request);
+
+        assertThat(response.status()).isEqualTo("REJECTED");
+        verify(orderRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(kafkaTemplate, never()).send(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
     }
 }
