@@ -17,8 +17,9 @@
     <name>order-service</name>
     <description>
         Order Service — Session 4 (Circuit Breaker + Retry), extended in
-        Session 5 (Bulkhead + TimeLimiter). Plain Spring Boot Servlet
-        (blocking) web service — NOT reactive/WebFlux.
+        Session 5 (Bulkhead + TimeLimiter), Session 6 (OpenFeign Inventory
+        pre-check), and Session 7 (Saga via Kafka). Plain Spring Boot
+        Servlet (blocking) web service — NOT reactive/WebFlux.
 
         CRITICAL: this module must depend on spring-boot-starter-aop.
         Resilience4j's @CircuitBreaker / @Retry / @Bulkhead / @TimeLimiter
@@ -28,9 +29,11 @@
         every time, which is confusing to debug). See Session 4 docx,
         "Common Issues &amp; Solutions" table.
 
-        Does NOT depend on OpenFeign (Session 6) or Spring Kafka (Session 7)
-        — Order Service calls PaymentService as a plain injected Spring bean
-        in this scope, not over the network. See OrderService.java for why.
+        createOrderAsync() (Sessions 4-5) still calls PaymentService as a
+        plain injected Spring bean, not over the network — see
+        OrderService.java's scope note. createOrder() (Session 7) is the
+        actual Saga initiator and does not call Payment directly at all;
+        it publishes an event instead.
     </description>
 
     <properties>
@@ -64,6 +67,28 @@
             <artifactId>spring-boot-starter-aop</artifactId>
             <!-- AOP is REQUIRED — Resilience4j annotations use Spring AOP -->
         </dependency>
+
+        <!-- Session 6 — OpenFeign -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+
+        <!-- Session 7 — Kafka (Saga) + JPA/PostgreSQL (Order persistence) -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

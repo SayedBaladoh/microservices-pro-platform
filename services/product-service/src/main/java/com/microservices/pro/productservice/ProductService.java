@@ -3,31 +3,60 @@ package com.microservices.pro.productservice;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * ProductService — Session 1, Lab 1.
+ * ProductService.
  *
- * In-memory store (no DB yet — see Session 1 homework for the JPA + PostgreSQL
- * upgrade). Implement the 5 TODOs below. See docs/labs/session-01-lab-01.md
- * for the full lab instructions.
+ * History:
+ *   Session 1 — in-memory Map<Long, Product> store.
+ *   Session 1 homework (already wired into this skeleton) — replaced with
+ *               a real ProductRepository (JPA + PostgreSQL).
+ *   Session 8 — add @Cacheable / @CacheEvict (Redis) in front of the
+ *               repository calls below. This is the actual Session 8 lab
+ *               TODO — implement the annotations and (for save/deleteById)
+ *               the cache-eviction logic.
+ *
+ * Implement the TODOs below. See docs/labs/session-08-lab-6a.md.
  */
 @Service
 public class ProductService {
 
-    // TODO 1: Inject a Map<Long, Product> as an in-memory store (no DB yet)
-    //         Hint: use ConcurrentHashMap for thread safety.
+    private final ProductRepository productRepository;
 
-    // TODO 2: Implement findAll() returning List<Product>
+    public ProductService(ProductRepository productRepository) {
+        this.productRepository = productRepository;
+    }
 
-    // TODO 3: Implement findById(Long id) returning Optional<Product>
+    // TODO 1: annotate with @Cacheable(value="products", key="'all'")
+    public List<Product> findAll() {
+        return productRepository.findAll();
+    }
 
-    // TODO 4: Implement save(Product product) returning the saved Product
-    //         Hint: if product.id() is null, assign one yourself before storing.
+    // TODO 2: annotate with @Cacheable(value="products", key="#id")
+    public Optional<Product> findById(Long id) {
+        return productRepository.findById(id);
+    }
 
-    // TODO 5: Implement deleteById(Long id)
+    // TODO 3: annotate with @CacheEvict(value="products", key="#result.id")
+    //         Also call evictAllProductsCache() — saving a product must also
+    //         invalidate the cached "all products" list, or it goes stale
+    //         (a documented trap — see Session 8 docx, S08-Q04).
+    public Product save(Product product) {
+        Product saved = productRepository.save(product);
+        evictAllProductsCache();
+        return saved;
+    }
 
+    // TODO 4: annotate with @CacheEvict(value="products", key="#id")
+    //         Also call evictAllProductsCache() — same reasoning as save().
+    public void deleteById(Long id) {
+        productRepository.deleteById(id);
+        evictAllProductsCache();
+    }
+
+    // TODO 5: annotate with @CacheEvict(value="products", key="'all'")
+    public void evictAllProductsCache() {
+        // Called internally on any write operation.
+    }
 }
