@@ -1,9 +1,8 @@
 # application.yml — Order Service
 # Session 4 — adds: resilience4j.circuitbreaker, resilience4j.retry
 # Session 5 — adds: resilience4j.bulkhead, resilience4j.timelimiter
-#
-# This is the final, merged configuration — all four Resilience4j patterns
-# configured together, as they are applied together on createOrderAsync().
+# Session 6 — adds: (no new config — Feign uses Eureka discovery automatically)
+# Session 7 — adds: spring.datasource (Order persistence), spring.kafka
 
 server:
   port: 8082
@@ -13,6 +12,30 @@ spring:
     name: order-service
   config:
     import: "optional:configserver:http://localhost:8888"
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/microservices_pro
+    username: postgres
+    password: postgres
+    # DEV ONLY — see Product Service's application.yml for the same note.
+  jpa:
+    hibernate:
+      ddl-auto: update  # DEV ONLY — see Product Service's application.yml.
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: ${spring.application.name}  # default; specific @KafkaListeners
+                                              # override with their own groupId —
+                                              # see OrderSagaEventHandler.java
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.microservices.pro.*"
+      auto-offset-reset: earliest
 
 eureka:
   client:

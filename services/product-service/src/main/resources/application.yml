@@ -1,5 +1,7 @@
 # application.yml — Product Service
-# Session 1 — Architecture & Spring Cloud
+# Session 1 — port, Eureka, Config Server
+# Session 1 homework (implemented Session 8) — spring.datasource (PostgreSQL)
+# Session 8 — spring.data.redis, spring.cache
 #
 # Port 8081: clients reach Product Service through the API Gateway (port 8080,
 # added Session 2) via Eureka service discovery — they never need to know this
@@ -14,6 +16,31 @@ spring:
   config:
     import: "optional:configserver:http://localhost:8888"
 
+  datasource:
+    url: jdbc:postgresql://localhost:5432/microservices_pro
+    username: postgres
+    password: postgres
+    # DEV ONLY — plaintext credentials. In production these come from
+    # Vault (Session 21) and are never committed to git.
+  jpa:
+    hibernate:
+      ddl-auto: update  # DEV ONLY — auto-creates/updates the schema from
+                         # the @Entity. Production uses Flyway/Liquibase
+                         # migrations instead.
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      # Same Redis container as Session 3's RequestRateLimiter token
+      # bucket store — this is its SECOND, unrelated use (response caching).
+      # See docker-compose.yml for the full note.
+  cache:
+    type: redis
+    redis:
+      time-to-live: 300000      # 5 minutes TTL (milliseconds)
+      cache-null-values: false  # do not cache null responses
+
 eureka:
   client:
     service-url:
@@ -25,4 +52,4 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,caches

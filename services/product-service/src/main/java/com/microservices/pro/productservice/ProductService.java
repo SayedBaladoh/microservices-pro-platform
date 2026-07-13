@@ -1,57 +1,64 @@
 package com.microservices.pro.productservice;
 
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * ProductService — Session 1, Lab 1.
+ * ProductService.
  *
- * In-memory store (no DB yet — see Session 1 homework for the JPA + PostgreSQL
- * upgrade). Implements the 5 TODOs from the original lab spec:
- *   1. Map<Long, Product> as the in-memory store
- *   2. findAll()
- *   3. findById(Long id)
- *   4. save(Product product)
- *   5. deleteById(Long id)
+ * History:
+ *   Session 1 — in-memory Map<Long, Product> store (findAll, findById,
+ *               save, deleteById TODOs).
+ *   Session 1 homework (implemented Session 8) — replaced the in-memory
+ *               Map with a real ProductRepository (JPA + PostgreSQL). See
+ *               Product.java and docs/labs/session-08-lab-6a.md for why
+ *               this was deferred until now.
+ *   Session 8 — added @Cacheable / @CacheEvict (Redis) in front of the
+ *               repository calls.
+ *
+ * Cache invalidation note (a documented trap — see Session 8 docx,
+ * S08-Q04): evicting the individual product key alone leaves the cached
+ * "all products" list stale. Every write path below evicts BOTH.
  */
 @Service
 public class ProductService {
 
-    // TODO 1 (solved in reference): in-memory store
-    private final Map<Long, Product> store = new ConcurrentHashMap<>();
-    private final AtomicLong idSequence = new AtomicLong(0);
+    private final ProductRepository productRepository;
 
-    // TODO 2 (solved in reference): findAll()
+    public ProductService(ProductRepository productRepository) {
+        this.productRepository = productRepository;
+    }
+
+    @Cacheable(value = "products", key = "'all'")
     public List<Product> findAll() {
-        return List.copyOf(store.values());
+        return productRepository.findAll();
     }
 
-    // TODO 3 (solved in reference): findById(Long id)
+    @Cacheable(value = "products", key = "#id")
     public Optional<Product> findById(Long id) {
-        return Optional.ofNullable(store.get(id));
+        return productRepository.findById(id);
     }
 
-    // TODO 4 (solved in reference): save(Product product)
+    @CacheEvict(value = "products", key = "#result.id")
     public Product save(Product product) {
-        Long id = product.id() != null ? product.id() : idSequence.incrementAndGet();
-        Product saved = new Product(
-                id,
-                product.name(),
-                product.description(),
-                product.price(),
-                product.category()
-        );
-        store.put(id, saved);
+        Product saved = productRepository.save(product);
+        evictAllProductsCache();
         return saved;
     }
 
-    // TODO 5 (solved in reference): deleteById(Long id)
+    @CacheEvict(value = "products", key = "#id")
     public void deleteById(Long id) {
-        store.remove(id);
+        productRepository.deleteById(id);
+        evictAllProductsCache();
+    }
+
+    @CacheEvict(value = "products", key = "'all'")
+    public void evictAllProductsCache() {
+        // Called internally on any write operation — evicts the cached
+        // "all products" list so it doesn't go stale after a save/delete.
     }
 }
