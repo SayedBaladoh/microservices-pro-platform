@@ -1,0 +1,149 @@
+name: Session 6-7-8 Validation
+
+# Why one shared workflow for three sessions: Sessions 6, 7, and 8 each
+# touch overlapping modules (order-service across all three; payment-service
+# in 7; product-service only in 8; inventory-service is new in 6, extended
+# in 7). A separate file per session would mean re-running near-identical
+# `mvn test` commands against the same modules multiple times with little
+# distinguishing value — the same reasoning documented in
+# session-04-05-validation.yml, extended here to three sessions instead of two.
+#
+# NOTE FOR FUTURE SESSIONS: this workflow's scope is Sessions 6 (Feign),
+# 7 (Saga/Kafka), and 8 (Redis caching on Product Service only). When
+# Session 9+ touches any of these same modules for a NEW reason (e.g.
+# Dockerizing them), give that its own session-09-validation.yml rather
+# than folding it in here.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/order-service/**'
+      - 'services/inventory-service/**'
+      - 'services/payment-service/**'
+      - 'services/product-service/**'
+  pull_request:
+    paths:
+      - 'services/order-service/**'
+      - 'services/inventory-service/**'
+      - 'services/payment-service/**'
+      - 'services/product-service/**'
+
+jobs:
+  test-order-service-feign-and-saga:
+    name: "order-service: Inventory pre-check (Feign, S6) + Saga initiator (Kafka, S7)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Guard — fail fast if spring-boot-starter-aop is missing (still required from S4-5)
+        run: |
+          if ! grep -q "spring-boot-starter-aop" services/order-service/pom.xml; then
+            echo "::error::services/order-service/pom.xml is missing spring-boot-starter-aop. Resilience4j annotations on createOrderAsync() (Sessions 4-5) require it."
+            exit 1
+          fi
+
+      - name: Guard — fail fast if @EnableFeignClients was removed
+        run: |
+          if ! grep -q "EnableFeignClients" services/order-service/src/main/java/com/microservices/pro/orderservice/OrderServiceApplication.java; then
+            echo "::error::OrderServiceApplication is missing @EnableFeignClients. InventoryClient (Session 6) requires it."
+            exit 1
+          fi
+
+      - name: Run order-service unit tests
+        working-directory: services/order-service
+        run: mvn -B test
+
+  test-inventory-service:
+    name: "inventory-service: stock pre-check (S6) + reserve/release Saga steps (S7)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Guard — Inventory Service must stay on the Servlet stack, not WebFlux
+        run: |
+          if grep -q "spring-boot-starter-webflux" services/inventory-service/pom.xml; then
+            echo "::error::services/inventory-service/pom.xml contains spring-boot-starter-webflux. Inventory Service is a plain blocking service in this scope."
+            exit 1
+          fi
+
+      - name: Run inventory-service unit tests
+        working-directory: services/inventory-service
+        run: mvn -B test
+
+  test-payment-service-saga:
+    name: "payment-service: Saga payment step (S7) — ignores non-InventoryReserved events"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Run payment-service unit tests
+        working-directory: services/payment-service
+        run: mvn -B test
+
+  test-product-service-caching:
+    name: "product-service: Redis caching in front of the JPA repository (S8)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Guard — fail fast if @EnableCaching is missing
+        run: |
+          if ! grep -q "EnableCaching" services/product-service/src/main/java/com/microservices/pro/productservice/ProductServiceApplication.java; then
+            echo "::error::ProductServiceApplication is missing @EnableCaching. @Cacheable/@CacheEvict on ProductService (Session 8) are silently ignored without it."
+            exit 1
+          fi
+
+      - name: Run product-service unit tests
+        working-directory: services/product-service
+        run: mvn -B test
+
+  verify-kafka-consumer-group-uniqueness:
+    name: "Saga-wide: verify no two @KafkaListener consumers share a groupId (S7)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract and count distinct groupId values across all three services
+        run: |
+          GROUPS=$(grep -rhoE 'groupId\s*=\s*"[^"]+"' \
+            services/order-service/src/main/java \
+            services/inventory-service/src/main/java \
+            services/payment-service/src/main/java \
+            2>/dev/null | sort)
+          TOTAL=$(echo "$GROUPS" | grep -c . || true)
+          UNIQUE=$(echo "$GROUPS" | sort -u | grep -c . || true)
+          echo "Found groupIds:"
+          echo "$GROUPS"
+          if [ "$TOTAL" != "$UNIQUE" ]; then
+            echo "::error::Duplicate Kafka consumer group IDs detected across the Saga's three services. A duplicated groupId causes silent message loss, not a visible error — see docs/labs/session-07-lab-5a.md's consumer group table."
+            exit 1
+          fi
+          echo "OK: $UNIQUE distinct group IDs, no duplicates."
