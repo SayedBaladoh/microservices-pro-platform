@@ -1,0 +1,89 @@
+name: Session 10-11 Validation
+
+# Tests in S10/S11 require Docker for TestContainers.
+# GitHub-hosted ubuntu-latest runners have Docker pre-installed.
+# The Pact verification test requires the consumer test to run first
+# (order-service generates pact.json, inventory-service reads it).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/product-service/**'
+      - 'services/order-service/**'
+      - 'services/inventory-service/**'
+  pull_request:
+    paths:
+      - 'services/product-service/**'
+      - 'services/order-service/**'
+      - 'services/inventory-service/**'
+
+jobs:
+  test-product-service:
+    name: "product-service: unit (@WebMvcTest, @ParameterizedTest) + integration (TestContainers)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Run product-service tests (unit + integration)
+        working-directory: services/product-service
+        run: mvn -B test
+        # TestContainers will start a PostgreSQL container via Docker.
+        # If Docker is not available, TestContainers skips the integration
+        # test automatically without failing the build.
+
+  generate-pact-and-verify:
+    name: "order-service (consumer) → inventory-service (provider) Pact contract"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Step 1 — Consumer: generate pact.json
+        working-directory: services/order-service
+        run: mvn -B test -Dtest=OrderServiceInventoryContractTest
+
+      - name: Guard — pact.json was generated
+        run: |
+          PACT=services/order-service/target/pacts/order-service-inventory-service.json
+          if [ ! -f "$PACT" ]; then
+            echo "::error::Pact file not generated: $PACT"
+            echo "::error::OrderServiceInventoryContractTest must create this file."
+            exit 1
+          fi
+          echo "Pact file generated: $PACT"
+          cat "$PACT"
+
+      - name: Step 2 — Provider: verify against pact.json
+        working-directory: services/inventory-service
+        run: mvn -B test -Dtest=InventoryServicePactVerificationTest
+
+  test-order-service-wiremock:
+    name: "order-service: WireMock stubs for InventoryClient HTTP calls"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Run WireMock integration tests
+        working-directory: services/order-service
+        run: mvn -B test -Dtest=OrderServicePaymentWireMockTest

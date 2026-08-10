@@ -8,41 +8,60 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * InventoryService.
  *
- * Implement the TODOs below. See docs/labs/session-06-lab-4a.md and
- * docs/labs/session-07-lab-5a.md.
+ * Session 6  — checkStock()
+ * Session 7  — reserveStock() / releaseStock()
+ * Session 11 — resetForTesting() (package-private, for Pact @State setup only)
  */
 @Service
 public class InventoryService {
 
-    // TODO 1 (Session 6): in-memory store, pre-populated with:
-    //   PROD-001: 100 units available
-    //   PROD-002: 5 units available
-    //   PROD-003: 0 units (out of stock)
-    private final Map<String, StockItem> stock = new ConcurrentHashMap<>();
+    private final Map<String, StockItem> stock = new ConcurrentHashMap<>(Map.of(
+            "PROD-001", new StockItem("PROD-001", 100, 0),
+            "PROD-002", new StockItem("PROD-002", 5, 0),
+            "PROD-003", new StockItem("PROD-003", 0, 0)
+    ));
 
-    private final Map<String, Object> reservationsByOrderId = new ConcurrentHashMap<>();
+    private final Map<String, Reservation> reservationsByOrderId = new ConcurrentHashMap<>();
 
-    // TODO 2 (Session 6): checkStock(productId, requestedQty) → StockCheckResponse
-    //         Look up the StockItem (default to 0 available if unknown productId),
-    //         compute available = item.hasStock(requestedQty), and return the response.
+    private record Reservation(String productId, int quantity) {}
+
     public StockCheckResponse checkStock(String productId, int requestedQty) {
-        throw new UnsupportedOperationException("TODO: implement checkStock()");
+        StockItem item = stock.getOrDefault(productId, new StockItem(productId, 0, 0));
+        boolean available = item.hasStock(requestedQty);
+        return new StockCheckResponse(productId, requestedQty,
+                available, item.availableQuantity() - item.reservedQuantity());
     }
 
-    // TODO 3 (Session 7): reserveStock(productId, quantity, orderId)
-    //         Throw InsufficientStockException if !item.hasStock(quantity).
-    //         Otherwise increase reservedQuantity and remember the
-    //         (productId, quantity) for this orderId so releaseStock() can
-    //         undo it later.
     public void reserveStock(String productId, int quantity, String orderId) {
-        throw new UnsupportedOperationException("TODO: implement reserveStock()");
+        StockItem item = stock.getOrDefault(productId, new StockItem(productId, 0, 0));
+        if (!item.hasStock(quantity)) {
+            throw new InsufficientStockException(
+                    "Cannot reserve " + quantity + " of " + productId + " for order " + orderId);
+        }
+        stock.put(productId, new StockItem(
+                item.productId(), item.availableQuantity(), item.reservedQuantity() + quantity));
+        reservationsByOrderId.put(orderId, new Reservation(productId, quantity));
     }
 
-    // TODO 4 (Session 7): releaseStock(orderId) — compensation.
-    //         Look up what this orderId reserved and decrease
-    //         reservedQuantity accordingly. Must be idempotent: if nothing
-    //         is found for this orderId, do nothing (no exception).
     public void releaseStock(String orderId) {
-        throw new UnsupportedOperationException("TODO: implement releaseStock()");
+        Reservation reservation = reservationsByOrderId.remove(orderId);
+        if (reservation == null) return;
+        StockItem item = stock.getOrDefault(reservation.productId(), new StockItem(reservation.productId(), 0, 0));
+        int newReserved = Math.max(0, item.reservedQuantity() - reservation.quantity());
+        stock.put(reservation.productId(), new StockItem(item.productId(), item.availableQuantity(), newReserved));
+    }
+
+    /**
+     * Session 11 — Pact @State setup helper.
+     *
+     * Package-private intentionally — only used by InventoryServicePactVerificationTest
+     * to set the in-memory stock to a known state before each Pact interaction is
+     * verified. MUST NOT be called from production code.
+     *
+     * If this service ever moves to a persistent store (JPA), this method will need
+     * to call the repository instead of mutating the in-memory map directly.
+     */
+    void resetForTesting(String productId, int available, int reserved) {
+        stock.put(productId, new StockItem(productId, available, reserved));
     }
 }
