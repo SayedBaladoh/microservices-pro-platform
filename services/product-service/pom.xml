@@ -16,13 +16,14 @@
     <version>1.0.0</version>
     <name>product-service</name>
     <description>
-        Product Service — Session 1. First domain microservice in the platform.
-        In-memory store for now (JPA + PostgreSQL is Session 1 homework / Phase 2).
+        Product Service — Session 1 (REST API), Session 8 (JPA + Redis caching),
+        Session 10 (test slices: @WebMvcTest + TestContainers integration test).
     </description>
 
     <properties>
         <java.version>21</java.version>
         <spring-cloud.version>2023.0.3</spring-cloud.version>
+        <testcontainers.version>1.19.8</testcontainers.version>
     </properties>
 
     <dependencies>
@@ -42,8 +43,7 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
-
-        <!-- Session 1 homework, implemented Session 8 — JPA + PostgreSQL -->
+        <!-- Session 8 — JPA + PostgreSQL -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
@@ -53,7 +53,6 @@
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
-
         <!-- Session 8 — Redis caching -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -63,10 +62,33 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-cache</artifactId>
         </dependency>
-
+        <!-- Testing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Session 10 — TestContainers: real PostgreSQL in integration tests.
+             ⚖ ENGINEERING DECISION: @DataJpaTest+H2 vs TestContainers+PostgreSQL
+               @DataJpaTest+H2:  fast, no Docker required, but H2 is NOT PostgreSQL.
+                                  Queries valid in H2 may fail on real PostgreSQL.
+                                  Unique index violations silently ignored by H2.
+               TestContainers:   starts real PostgreSQL container. Catches database-
+                                  specific behaviour H2 cannot simulate. Requires
+                                  Docker Desktop. Slower but genuinely trustworthy. -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -77,6 +99,13 @@
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-dependencies</artifactId>
                 <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-bom</artifactId>
+                <version>${testcontainers.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
