@@ -1,6 +1,7 @@
 # application.yml — Inventory Service
-# Session 6 — port, Eureka, Config Server
-# Session 7 — adds: spring.kafka
+# Session 6  — port, Eureka, Config Server
+# Session 7  — kafka (order-events, inventory-events, payment-events for Choreography)
+# Session 12 — adds: consumer group inventory-saga-handler on saga-commands
 
 server:
   port: 8084
@@ -10,23 +11,24 @@ spring:
     name: inventory-service
   config:
     import: "optional:configserver:http://localhost:8888"
-
   kafka:
     bootstrap-servers: localhost:9092
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
     consumer:
-      group-id: ${spring.application.name}  # default group; specific @KafkaListeners
-                                              # override with their own groupId where
-                                              # the docx requires a DIFFERENT group
-                                              # (e.g. inventory-compensation) — see
-                                              # InventorySagaHandler.java
+      # Default group for S7 Choreography listeners
+      group-id: ${spring.application.name}
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "com.microservices.pro.*"
-      auto-offset-reset: earliest   # if new consumer, read from beginning
+      auto-offset-reset: earliest
+      # Session 12 group IDs on this service:
+      #   inventory-saga-handler  (InventorySagaCommandHandler, saga-commands)
+      # Session 7 group IDs still active on this service (Choreography coexists):
+      #   inventory-service       (InventorySagaHandler, order-events)
+      #   inventory-compensation  (InventorySagaHandler, payment-events)
 
 eureka:
   client:

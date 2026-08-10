@@ -1,8 +1,11 @@
 # application.yml — Order Service
-# Session 4 — adds: resilience4j.circuitbreaker, resilience4j.retry
-# Session 5 — adds: resilience4j.bulkhead, resilience4j.timelimiter
-# Session 6 — adds: (no new config — Feign uses Eureka discovery automatically)
-# Session 7 — adds: spring.datasource (Order persistence), spring.kafka
+# Session 4  — resilience4j config
+# Session 5  — bulkhead + timelimiter
+# Session 6  — (Feign uses Eureka, no new config)
+# Session 7  — datasource + kafka (order-events, inventory-events, payment-events)
+# Session 12 — adds saga-commands + saga-results consumer factory
+#              (configured via SagaKafkaConfig.java — see that class for why
+#               a separate factory is needed)
 
 server:
   port: 8082
@@ -12,30 +15,34 @@ spring:
     name: order-service
   config:
     import: "optional:configserver:http://localhost:8888"
-
   datasource:
     url: jdbc:postgresql://localhost:5432/microservices_pro
     username: postgres
     password: postgres
-    # DEV ONLY — see Product Service's application.yml for the same note.
   jpa:
     hibernate:
-      ddl-auto: update  # DEV ONLY — see Product Service's application.yml.
-
+      ddl-auto: update  # DEV ONLY
   kafka:
     bootstrap-servers: localhost:9092
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
     consumer:
-      group-id: ${spring.application.name}  # default; specific @KafkaListeners
-                                              # override with their own groupId —
-                                              # see OrderSagaEventHandler.java
+      group-id: ${spring.application.name}
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "com.microservices.pro.*"
       auto-offset-reset: earliest
+    # Session 12 — Orchestrator listens on saga-results with 3 distinct groups.
+    # These are configured programmatically in SagaKafkaConfig.java using
+    # @KafkaListener(containerFactory = "sagaResultsListenerFactory").
+    # No additional yml config needed here beyond the bootstrap-servers above.
+    #
+    # Consumer group IDs introduced in S12 (all distinct from S7 groups):
+    #   orchestrator-inventory    (saga-results, handleInventoryResult)
+    #   orchestrator-payment      (saga-results, handlePaymentResult)
+    #   orchestrator-compensation (saga-results, handleInventoryReleased)
 
 eureka:
   client:
@@ -58,34 +65,30 @@ resilience4j:
     instances:
       paymentService:
         sliding-window-type: COUNT_BASED
-        sliding-window-size: 10          # track last 10 calls
-        failure-rate-threshold: 50        # open if 50%+ fail
-        wait-duration-in-open-state: 5s  # wait 5s before HALF-OPEN
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 5s
         permitted-number-of-calls-in-half-open-state: 3
         automatic-transition-from-open-to-half-open-enabled: true
-        register-health-indicator: true  # expose via Actuator
-
+        register-health-indicator: true
   retry:
     instances:
       paymentService:
-        max-attempts: 3             # try 3 times total
-        wait-duration: 500ms        # wait 500ms between attempts
+        max-attempts: 3
+        wait-duration: 500ms
         enable-exponential-backoff: true
-        exponential-backoff-multiplier: 2  # 500ms → 1s → 2s
+        exponential-backoff-multiplier: 2
         retry-exceptions:
-          - java.lang.RuntimeException   # only retry on these
+          - java.lang.RuntimeException
         ignore-exceptions:
-          - java.lang.IllegalArgumentException  # never retry on these
-
-  # Session 5 — added below
+          - java.lang.IllegalArgumentException
   bulkhead:
     instances:
       paymentService:
-        max-concurrent-calls: 10    # max 10 simultaneous calls to Payment
-        max-wait-duration: 0ms      # do NOT wait — fail immediately if full
-
+        max-concurrent-calls: 10
+        max-wait-duration: 0ms
   timelimiter:
     instances:
       paymentService:
-        timeout-duration: 2s         # fail if Payment takes > 2 seconds
-        cancel-running-future: true  # cancel the thread on timeout
+        timeout-duration: 2s
+        cancel-running-future: true
