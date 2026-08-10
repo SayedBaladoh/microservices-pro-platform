@@ -1,0 +1,37 @@
+# .dockerignore — applies to every Spring Boot service in this repo
+#
+# Excludes everything that should NOT be in the Docker build context.
+# A smaller build context = faster docker build (less data sent to the daemon).
+
+# Maven build output — the builder stage will recompile from source
+target/
+
+# IDE metadata
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.classpath
+.project
+.settings/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker files themselves (no need to COPY them into the image)
+Dockerfile
+.dockerignore
+
+# Logs
+*.log
+logs/
+
+# Local environment overrides
+.env
+docker-compose.override.yml
