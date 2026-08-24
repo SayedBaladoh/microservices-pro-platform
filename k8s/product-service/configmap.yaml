@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-config
+  namespace: ecommerce
+data:
+  eureka.url: "http://eureka-server:8761/eureka/"
+  datasource.url: "jdbc:postgresql://postgres:5432/microservices_pro"
+  # DEV ONLY: credentials in ConfigMap are not secure.
+  # Production: use Kubernetes Secrets (or Vault — Session 21) for passwords.
+  # This ConfigMap holds only non-sensitive configuration keys.

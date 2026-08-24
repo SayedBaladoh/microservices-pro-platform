@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service-canary
+  namespace: ecommerce
+  labels:
+    app: product-service
+    track: canary
+spec:
+  replicas: 2
+  # 🎯 DESIGN CHOICE — Canary Deployment (Session 14):
+  # 8 stable + 2 canary = 10 total pods.
+  # Traffic split ≈ 80% stable / 20% canary (Kubernetes Service routes
+  # randomly across all pods matching app=product-service).
+  # This is a rough split — for precise percentage-based routing use
+  # Istio or an Ingress with traffic weights (Session 21/22 scope).
+  selector:
+    matchLabels:
+      app: product-service
+      track: canary
+  template:
+    metadata:
+      labels:
+        app: product-service
+        track: canary
+    spec:
+      containers:
+        - name: product-service
+          image: ghcr.io/OWNER/microservices-pro/product-service:CANARY_SHA
+          # Replace CANARY_SHA with the specific commit SHA under test.
+          # The stable deployment uses 'latest'; the canary uses a pinned SHA.
+          # If canary metrics look good, promote: update stable deployment to CANARY_SHA.
+          # If metrics degrade: kubectl scale deployment product-service-canary --replicas=0
+          ports:
+            - containerPort: 8081
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "kubernetes"
+            - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+              valueFrom:
+                configMapKeyRef:
+                  name: platform-config
+                  key: eureka.url
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: platform-config
+                  key: datasource.url

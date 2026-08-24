@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: product-service
+  namespace: argocd
+  # ArgoCD itself runs in the "argocd" namespace.
+  # It manages resources in the "ecommerce" namespace (see spec.destination below).
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/OWNER/microservices-pro-platform
+    # Replace OWNER with your GitHub username or org.
+    targetRevision: main
+    path: k8s/product-service
+    # ArgoCD watches this directory. Any change to a YAML file here
+    # triggers a sync — this is the Pull model of GitOps.
+    # 🎯 DESIGN CHOICE — Push vs Pull (Session 14):
+    #   Push: CI pipeline runs kubectl apply directly (simple, less overhead)
+    #   Pull: ArgoCD polls the Git repo and applies changes (auditable,
+    #         drift detection, works behind firewalls — production default)
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ecommerce
+  syncPolicy:
+    automated:
+      prune: true      # delete resources removed from Git
+      selfHeal: true   # revert manual kubectl changes (GitOps enforcement)
+    syncOptions:
+      - CreateNamespace=true   # creates "ecommerce" namespace if it doesn't exist
