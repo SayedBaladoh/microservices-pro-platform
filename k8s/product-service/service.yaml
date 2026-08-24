@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-service
+  namespace: ecommerce
+spec:
+  selector:
+    app: product-service
+    # NOTE: selector matches app=product-service only (no track label).
+    # This means the Service routes to BOTH stable and canary pods,
+    # giving the approximate 80/20 traffic split (8 stable + 2 canary).
+  ports:
+    - protocol: TCP
+      port: 8081
+      targetPort: 8081
+  type: ClusterIP
+  # ClusterIP: accessible within the cluster only.
+  # External access goes through the API Gateway (port 8080).
+  # 🎯 DESIGN CHOICE note: ClusterIP vs NodePort vs LoadBalancer
+  # is covered in Session 15 — do not add NodePort/LoadBalancer here.

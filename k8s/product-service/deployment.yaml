@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service
+  namespace: ecommerce
+  labels:
+    app: product-service
+    track: stable
+spec:
+  replicas: 8
+  selector:
+    matchLabels:
+      app: product-service
+      track: stable
+  template:
+    metadata:
+      labels:
+        app: product-service
+        track: stable
+    spec:
+      containers:
+        - name: product-service
+          image: ghcr.io/OWNER/microservices-pro/product-service:latest
+          # Replace OWNER with your GitHub username or org.
+          # In production: use the specific SHA tag (${{ github.sha }}) from CI,
+          # never 'latest' — see Session 14 docx, 3.4 "push vs pull" discussion.
+          ports:
+            - containerPort: 8081
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "kubernetes"
+            - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+              valueFrom:
+                configMapKeyRef:
+                  name: platform-config
+                  key: eureka.url
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: platform-config
+                  key: datasource.url
+          # TODO (Session 15): add resource requests/limits
+          # resources:
+          #   requests:
+          #     memory: "256Mi"
+          #     cpu: "250m"
+          #   limits:
+          #     memory: "512Mi"
+          #     cpu: "500m"
+
+          # TODO (Session 15): add readinessProbe
+          # readinessProbe:
+          #   httpGet:
+          #     path: /actuator/health/readiness
+          #     port: 8081
+          #   initialDelaySeconds: 30
+          #   periodSeconds: 10
+
+          # TODO (Session 15): add livenessProbe
+          # livenessProbe:
+          #   httpGet:
+          #     path: /actuator/health/liveness
+          #     port: 8081
+          #   initialDelaySeconds: 60
+          #   periodSeconds: 30
