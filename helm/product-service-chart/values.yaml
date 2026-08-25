@@ -1,0 +1,45 @@
+# values.yaml — product-service-chart
+# Override any value with: helm upgrade --set key=value
+# Or supply a custom values file: helm upgrade -f values-prod.yaml
+
+replicaCount: 8
+
+image:
+  repository: ghcr.io/OWNER/microservices-pro/product-service
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8081
+
+resources:
+  requests:
+    cpu: "200m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "768Mi"
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+probes:
+  readiness:
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  liveness:
+    initialDelaySeconds: 60
+    periodSeconds: 30
+
+env:
+  eurekaUrl: "http://eureka-server:8761/eureka/"
+  datasourceUrl: "jdbc:postgresql://postgres:5432/microservices_pro"
+
+serviceAccount:
+  name: product-service-sa
+
+namespace: ecommerce

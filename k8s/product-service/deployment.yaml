@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service
+  namespace: ecommerce
+  labels:
+    app: product-service
+    track: stable
+spec:
+  replicas: 8
+  selector:
+    matchLabels:
+      app: product-service
+      track: stable
+  template:
+    metadata:
+      labels:
+        app: product-service
+        track: stable
+    spec:
+      serviceAccountName: product-service-sa
+      # ServiceAccount added in Session 16 (RBAC). Set to "default" if
+      # running S15 manifests before completing S16 Helm chart.
+      containers:
+        - name: product-service
+          image: ghcr.io/OWNER/microservices-pro/product-service:latest
+          ports:
+            - containerPort: 8081
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "kubernetes"
+            - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+              valueFrom:
+                configMapKeyRef:
+                  name: platform-config
+                  key: eureka.url
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: platform-config
+                  key: datasource.url
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: product-service-secret
+                  key: db-password
+                  # Session 15: passwords come from Secrets, never ConfigMaps.
+                  # Production: use Vault (Session 21) to inject secrets at runtime.
+
+          # ⚖ ENGINEERING DECISION — Liveness vs Readiness (Session 15):
+          # readinessProbe: "Am I ready to receive traffic?"
+          #   → K8s removes pod from Service endpoints while NOT ready.
+          #   → Use for startup and dependency checks.
+          # livenessProbe:  "Am I still alive?"
+          #   → K8s restarts the container if this fails.
+          #   → Use for deadlock / hung-process detection.
+          #   → initialDelaySeconds must be LONGER than readiness to avoid
+          #     restarting a pod that is still starting up.
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8081
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 3
+
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "768Mi"
+            # requests: what K8s reserves on a node for scheduling.
+            # limits:   hard ceiling — container is OOM-killed if exceeded.
+            # Setting limits without requests uses requests = limits.
+            # Setting requests without limits → unbounded resource use.
