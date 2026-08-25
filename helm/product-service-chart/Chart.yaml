@@ -1,0 +1,15 @@
+apiVersion: v2
+name: product-service-chart
+description: |
+  Helm chart for Product Service — Session 16.
+  Packages: Deployment, Service, HPA, ServiceAccount, Role, RoleBinding.
+  🎯 DESIGN CHOICE: Raw K8s manifests (Sessions 14-15) vs Helm chart (Session 16):
+    Raw manifests: simple, readable, no tooling required.
+    Helm:          templated, reusable across environments (dev/staging/prod),
+                   values.yaml centralises all environment-specific config,
+                   `helm upgrade` tracks release history and enables rollback.
+    When to use Helm: 2+ environments with different values, shared charts,
+                      or when release management and rollback matter.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

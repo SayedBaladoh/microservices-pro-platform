@@ -1,0 +1,25 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: product-service-hpa
+  namespace: ecommerce
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: product-service
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+          # Scale up when average CPU across all pods exceeds 70%.
+          # Scale down when sustained below 70% (default cooldown: 5 min).
+          #
+          # REQUIRES: resource.requests.cpu set on the container.
+          # Without requests, K8s cannot compute utilization percentage
+          # (no baseline to compare against) and HPA stays at minReplicas.

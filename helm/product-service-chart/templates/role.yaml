@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-product-service-role
+  namespace: {{ .Values.namespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list"]
+    # Read-only access to ConfigMaps and Secrets in the ecommerce namespace.
+    # Principle of least privilege: product-service needs to read its config;
+    # it must NOT be able to create, update, or delete cluster resources.
