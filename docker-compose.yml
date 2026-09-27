@@ -1,86 +1,41 @@
-# docker-compose.yml
-# Sessions 1-8.
+# docker-compose.yml — Session 19 addition: Keycloak
 #
-# This repository follows OBG-001 (Curriculum Leakage Rule) strictly:
-# infrastructure is only added to this file in the session that teaches it.
+# Add this block to the existing docker-compose.yml.
+# Port 8180 (not 8080) to avoid conflict with the API Gateway.
 #
-# A NOTE ON REDIS (two unrelated uses, two different sessions):
-# PROJECT_CONTEXT.md's service table lists "Redis cache added S8" — that
-# entry is about Spring Cache / @Cacheable on Product Service, taught in
-# Session 8 (see ProductService.java). The SAME Redis container was
-# already added back in Session 3 for a different concern: Spring Cloud
-# Gateway's RequestRateLimiter token bucket counters (see
-# Session_03_Gateway_Advanced.docx, "Rate Limiting with Redis"). Same
-# tool, two unrelated jobs, each taught in its own correct session. As of
-# Session 8, this one Redis instance genuinely serves BOTH purposes at
-# once: the Gateway's rate limiter and Product Service's response cache.
-# This is not curriculum leakage in either direction — it's confirmation
-# that the same instance now has two live, independent consumers.
+# Dev mode (start-dev): no SSL required, embeds H2 database.
+# Production: use KC_DB + KC_DB_URL + proper TLS.
 #
-# A NOTE ON KAFKA (added in Session 7, not earlier):
-# This is Kafka's first appearance in this file. Order Service, Inventory
-# Service, and Payment Service all use it from Session 7 onward for the
-# Choreography Saga (see Session_07_Distributed_Transactions_Saga.docx).
-# Kafka requires Zookeeper in this version; both are added together.
+# Admin credentials: admin / admin (DEV ONLY — change in production).
 #
-# Only PostgreSQL, Redis, and Kafka/Zookeeper are containerized here.
-# Eureka Server, Config Server, API Gateway, and all Spring Boot services
-# run directly on your machine via `mvn spring-boot:run` (or your IDE)
-# through Session 8 — see docs/setup/local-setup.md. Containerizing the
-# Spring Boot services themselves (Dockerfile per service) is Session 9 —
-# do not add it early.
+# After startup, import the realm:
+#   - Open http://localhost:8180
+#   - Login: admin / admin
+#   - Create Realm → Import → select keycloak/realm-export.json
+#   OR use the auto-import via KC_IMPORT (see below).
 
-services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: postgres
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.4
+    container_name: keycloak
+    networks:
+      - platform-net
     ports:
-      - "5432:5432"
+      - "8180:8080"
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: microservices_pro
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+    command: start-dev --import-realm
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
+      # Mounts realm-export.json for auto-import on first start.
+      # Keycloak imports all JSON files in this directory at startup.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    container_name: redis
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.6.1
-    container_name: zookeeper
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - "2181:2181"
-
-  kafka:
-    image: confluentinc/cp-kafka:7.6.1
-    container_name: kafka
-    depends_on:
-      - zookeeper
-    ports:
-      - "9092:9092"
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-    healthcheck:
-      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
-      interval: 10s
+      test: ["CMD-SHELL",
+             "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200'"]
+      interval: 15s
       timeout: 10s
+      start_period: 60s
       retries: 5
