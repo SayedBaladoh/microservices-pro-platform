@@ -1,0 +1,50 @@
+{
+  "realm": "ecommerce-platform",
+  "enabled": true,
+  "displayName": "E-Commerce Platform",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "clients": [
+    {
+      "clientId": "gateway",
+      "name": "API Gateway Client",
+      "description": "Confidential client for the API Gateway — Session 19",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "gateway-secret-dev-only",
+      "redirectUris": [
+        "http://localhost:8080/*",
+        "http://localhost:8180/*"
+      ],
+      "webOrigins": ["*"],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "protocol": "openid-connect"
+    }
+  ],
+  "users": [
+    {
+      "username": "customer1",
+      "enabled": true,
+      "email": "customer1@ecommerce.dev",
+      "firstName": "Test",
+      "lastName": "Customer",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "customer123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["customer"]
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "customer",
+        "description": "Standard customer role — Session 19"
+      }
+    ]
+  }
+}
