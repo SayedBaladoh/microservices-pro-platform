@@ -1,9 +1,12 @@
 package com.microservices.pro.paymentservice;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -11,43 +14,83 @@ import java.util.Random;
 import java.util.UUID;
 
 /**
- * PaymentController — Session 4, Lab 3A, Task 1.
+ * PaymentController — Session 4 (original) + Session 22 (idempotency).
  *
- * Simulates an unstable payment gateway:
- *   - payment.failure-rate (Session 4): random chance the call throws instead
- *     of succeeding, so Order Service has real failures to protect against.
- *   - payment.delay-ms (Session 5): optional artificial response delay, used
- *     to demonstrate TimeLimiter cutting off a slow-but-not-down call. Zero
- *     by default — Session 4 never sets this, only Session 5's live coding does.
+ * Session 22 change: every POST /api/v1/payments MUST include an
+ * Idempotency-Key header. The controller checks the header before
+ * processing:
+ *   - Key already in DB, status COMPLETED: return cached response (200)
+ *   - Key already in DB, status PROCESSING: return 202 Accepted
+ *   - Key not in DB: process and store
+ *
+ * Closes Session 4 Technical Debt:
+ *   "No idempotency on payment retry — if Resilience4j @Retry fires the
+ *    same payment request twice, the customer is charged twice."
  */
 @RestController
-@RequestMapping("/api/payments")
+@RequestMapping("/api/v1/payments")
 public class PaymentController {
+
+    private static final Logger log = LoggerFactory.getLogger(PaymentController.class);
 
     @Value("${payment.failure-rate:0.5}")
     private double failureRate;
 
     @Value("${payment.delay-ms:0}")
-    private long delayMs;
+    private int delayMs;
 
     private final Random random = new Random();
+    private final IdempotencyRepository idempotencyRepository;
+
+    public PaymentController(IdempotencyRepository idempotencyRepository) {
+        this.idempotencyRepository = idempotencyRepository;
+    }
 
     @PostMapping
-    public ResponseEntity<PaymentResponse> processPayment(@RequestBody PaymentRequest request)
-            throws InterruptedException {
+    public ResponseEntity<PaymentResponse> processPayment(
+            @RequestBody PaymentRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
 
+        // ── Idempotency check (Session 22) ────────────────────────────────
+        if (idempotencyKey != null) {
+            var existing = idempotencyRepository.findById(idempotencyKey);
+            if (existing.isPresent()) {
+                IdempotencyRecord record = existing.get();
+                log.info("[IDEMPOTENCY] Duplicate request detected for key={} status={}",
+                        idempotencyKey, record.getStatus());
+                if ("COMPLETED".equals(record.getStatus())) {
+                    return ResponseEntity.ok(
+                            new PaymentResponse("COMPLETED", record.getResponsePayload()));
+                }
+                return ResponseEntity.accepted()
+                        .body(new PaymentResponse("PROCESSING", "Payment already in progress"));
+            }
+            // New key — register as PROCESSING before doing any work
+            idempotencyRepository.save(new IdempotencyRecord(idempotencyKey, request.orderId()));
+        }
+
+        // ── Original Session 4 payment logic ──────────────────────────────
         if (delayMs > 0) {
-            Thread.sleep(delayMs);  // Session 5 — simulate a slow (not down) service
+            try { Thread.sleep(delayMs); }
+            catch (InterruptedException e) { Thread.currentThread().interrupt(); }
         }
 
         if (random.nextDouble() < failureRate) {
-            throw new RuntimeException("Payment gateway timeout");
+            if (idempotencyKey != null) {
+                idempotencyRepository.findById(idempotencyKey)
+                        .ifPresent(r -> { r.fail("Simulated failure"); idempotencyRepository.save(r); });
+            }
+            log.warn("[PAYMENT] Failed for orderId={}", request.orderId());
+            return ResponseEntity.internalServerError()
+                    .body(new PaymentResponse("FAILED", null));
         }
 
-        return ResponseEntity.ok(new PaymentResponse(
-                UUID.randomUUID().toString(),
-                "APPROVED",
-                request.amount()
-        ));
+        String transactionId = UUID.randomUUID().toString();
+        if (idempotencyKey != null) {
+            idempotencyRepository.findById(idempotencyKey)
+                    .ifPresent(r -> { r.complete(transactionId); idempotencyRepository.save(r); });
+        }
+        log.info("[PAYMENT] Completed orderId={} txId={}", request.orderId(), transactionId);
+        return ResponseEntity.ok(new PaymentResponse("COMPLETED", transactionId));
     }
 }
