@@ -1,0 +1,30 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: product-service
+  namespace: ecommerce
+spec:
+  host: product-service
+  trafficPolicy:
+    outlierDetection:
+      consecutive5xxErrors: 3
+      interval: 10s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      # 🎯 DESIGN CHOICE — Istio outlier detection vs Session 4 Resilience4j:
+      # Istio (mesh-level):      no application code, language-agnostic,
+      #                          ejects unhealthy pods from load balancing,
+      #                          cannot build domain-specific fallback responses.
+      # Resilience4j (app-level): Java-only, requires code, can return a
+      #                          meaningful OrderResponse(status=PENDING)
+      #                          as a fallback — the mesh cannot do this.
+      # These are NOT mutually exclusive. Use both: Istio ejects obviously
+      # unhealthy pods; Resilience4j handles partial failures with
+      # business-aware fallbacks.
+  subsets:
+    - name: stable
+      labels:
+        track: stable
+    - name: canary
+      labels:
+        track: canary
