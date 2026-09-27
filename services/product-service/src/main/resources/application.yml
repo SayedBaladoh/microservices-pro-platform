@@ -1,11 +1,7 @@
 # application.yml — Product Service
-# Session 1 — port, Eureka, Config Server
-# Session 1 homework (implemented Session 8) — spring.datasource (PostgreSQL)
-# Session 8 — spring.data.redis, spring.cache
-#
-# Port 8081: clients reach Product Service through the API Gateway (port 8080,
-# added Session 2) via Eureka service discovery — they never need to know this
-# port directly. See PROJECT_CONTEXT.md, Section 2, Platform Services table.
+# Session 1  — port, Eureka, Config Server
+# Session 8  — datasource, redis, cache
+# Session 17 — adds: tracing, prometheus endpoint, logging
 
 server:
   port: 8081
@@ -15,31 +11,46 @@ spring:
     name: product-service
   config:
     import: "optional:configserver:http://localhost:8888"
-
   datasource:
     url: jdbc:postgresql://localhost:5432/microservices_pro
     username: postgres
     password: postgres
-    # DEV ONLY — plaintext credentials. In production these come from
-    # Vault (Session 21) and are never committed to git.
   jpa:
     hibernate:
-      ddl-auto: update  # DEV ONLY — auto-creates/updates the schema from
-                         # the @Entity. Production uses Flyway/Liquibase
-                         # migrations instead.
-
+      ddl-auto: update
   data:
     redis:
       host: localhost
       port: 6379
-      # Same Redis container as Session 3's RequestRateLimiter token
-      # bucket store — this is its SECOND, unrelated use (response caching).
-      # See docker-compose.yml for the full note.
   cache:
     type: redis
     redis:
-      time-to-live: 300000      # 5 minutes TTL (milliseconds)
-      cache-null-values: false  # do not cache null responses
+      time-to-live: 300000
+      cache-null-values: false
+
+  # Session 17 — Distributed Tracing
+  # sampling.probability: 1.0 = trace EVERY request (DEV ONLY).
+  # Production: 0.1 (10%) or use adaptive sampling to reduce Zipkin load.
+  sleuth:
+    sampler:
+      probability: 1.0
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,caches,prometheus
+        # prometheus endpoint — scraped by Prometheus every 15s
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      # adds application="product-service" label to every Prometheus metric
+      # → enables per-service dashboards in Grafana
+  tracing:
+    sampling:
+      probability: 1.0
+    zipkin:
+      endpoint: http://localhost:9411/api/v2/spans
 
 eureka:
   client:
@@ -48,8 +59,12 @@ eureka:
   instance:
     prefer-ip-address: true
 
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,caches
+# Session 17 — Structured JSON logging
+# logback-spring.xml switches the format to JSON.
+# traceId and spanId are injected automatically by Micrometer Tracing
+# into the MDC and appear in every log line as JSON fields.
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{traceId}/%X{spanId}] %-5level %logger{36} - %msg%n"
+    # Used only when logback-spring.xml is NOT present (fallback).
+    # When logback-spring.xml IS present (as in this repo), it overrides this.
