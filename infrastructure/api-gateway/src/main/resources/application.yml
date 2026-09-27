@@ -1,6 +1,7 @@
 # application.yml — API Gateway
-# Session 2 — API Gateway & Routing
-# Session 3 — adds: jwt.secret, spring.data.redis, RequestRateLimiter filter
+# Session 2  — routing, load balancing
+# Session 3  — rate limiting, jwt.secret (DELETED in Session 20)
+# Session 20 — oauth2.resourceserver.jwt.issuer-uri (replaces jwt.secret)
 
 server:
   port: 8080
@@ -10,40 +11,42 @@ spring:
     name: api-gateway
   config:
     import: "optional:configserver:http://localhost:8888"
+  cloud:
+    gateway:
+      routes:
+        - id: product-service
+          uri: lb://PRODUCT-SERVICE
+          predicates:
+            - Path=/api/v1/products/**
+        - id: order-service
+          uri: lb://ORDER-SERVICE
+          predicates:
+            - Path=/api/orders/**
+        - id: inventory-service
+          uri: lb://INVENTORY-SERVICE
+          predicates:
+            - Path=/api/v1/inventory/**
+        - id: payment-service
+          uri: lb://PAYMENT-SERVICE
+          predicates:
+            - Path=/api/v1/payments/**
   data:
     redis:
       host: localhost
       port: 6379
-      # In production: host from Config Server, password from Vault (Session 21).
-      # This Redis instance backs RequestRateLimiter's token bucket counters —
-      # NOT the response caching introduced in Session 8. Same tool, different
-      # job; see docker-compose.yml for the full note.
-  cloud:
-    gateway:
-      discovery:
-        locator:
-          enabled: true          # DEV ONLY — auto-creates routes from Eureka for
-                                  # convenience during labs/demos. In production,
-                                  # use explicit routes only (discovery.locator.enabled:
-                                  # true exposes every Eureka-registered service as a
-                                  # route automatically — see Session 2 Daily Quiz Q6
-                                  # and Session 3 trap S02-Q06 on this exact risk).
-          lower-case-service-id: true
-      routes:
-        - id: product-service
-          uri: lb://PRODUCT-SERVICE    # lb = load balanced via Eureka
-          predicates:
-            - Path=/api/v1/products/**
-          filters:
-            - StripPrefix=0           # do not strip the path — Product Service
-                                       # expects the same /api/v1/products/** path
-            - AddResponseHeader=X-Platform, microservices-pro
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 10   # 10 req/sec steady
-                redis-rate-limiter.burstCapacity: 20    # up to 20 at once
-                redis-rate-limiter.requestedTokens: 1   # each request costs 1 token
-                key-resolver: "#{@ipKeyResolver}"
+
+  # Session 20 — Spring Security OAuth2 Resource Server.
+  # Spring fetches the JWKS from Keycloak automatically at startup.
+  # No shared secret. No hand-rolled signature validation.
+  # issuer-uri must match the 'iss' claim in every incoming JWT exactly.
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8180/realms/ecommerce-platform
+
+  # jwt.secret and PUBLIC_ROUTES config from Session 3 are DELETED.
+  # Do not re-add them — they are replaced, not supplemented.
 
 eureka:
   client:
@@ -55,16 +58,3 @@ management:
     web:
       exposure:
         include: health,info,gateway
-
-jwt:
-  secret: ${JWT_SECRET:microservices-pro-course-dev-secret-key-2026-min-256-bits}
-  # DEV ONLY — this fallback value is a placeholder for local development and
-  # training only. In production this comes from HashiCorp Vault (Session 21)
-  # and is NEVER committed to git. NEVER reuse this string in any real system.
-  #
-  # CRITICAL: this exact fallback string must match the one in
-  # tools/jwt-generator/.../JwtGeneratorApplication.java, or every token the
-  # generator produces will fail signature validation here. Prefer setting
-  # the JWT_SECRET environment variable identically in both places instead
-  # of relying on the fallback at all.
-

@@ -1,0 +1,81 @@
+{
+  "realm": "ecommerce-platform",
+  "enabled": true,
+  "displayName": "E-Commerce Platform",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "clients": [
+    {
+      "clientId": "gateway",
+      "name": "API Gateway Client",
+      "description": "Confidential client — Authorization Code Flow (Session 19)",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "gateway-secret-dev-only",
+      "redirectUris": [
+        "http://localhost:8080/*",
+        "http://localhost:8180/*"
+      ],
+      "webOrigins": ["*"],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "order-service",
+      "name": "Order Service Client",
+      "description": "Service-account client — Client Credentials Flow (Session 20). Used when order-service calls inventory-service with no user context.",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "order-service-secret-dev-only",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocol": "openid-connect"
+    }
+  ],
+  "users": [
+    {
+      "username": "customer1",
+      "enabled": true,
+      "email": "customer1@ecommerce.dev",
+      "firstName": "Test",
+      "lastName": "Customer",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "customer123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["customer"]
+    },
+    {
+      "username": "admin1",
+      "enabled": true,
+      "email": "admin1@ecommerce.dev",
+      "firstName": "Test",
+      "lastName": "Admin",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["customer", "admin"]
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "customer",
+        "description": "Standard customer role"
+      },
+      {
+        "name": "admin",
+        "description": "Admin role — access to /api/admin/** routes (Session 20)"
+      }
+    ]
+  }
+}

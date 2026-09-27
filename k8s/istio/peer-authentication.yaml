@@ -1,0 +1,23 @@
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: ecommerce
+spec:
+  mtls:
+    mode: STRICT
+    # STRICT: all service-to-service traffic within the ecommerce namespace
+    # must use mTLS. Plain HTTP calls from non-injected pods are rejected.
+    #
+    # PERMISSIVE (default): accepts both mTLS and plaintext — safer during
+    # migration, but provides no security guarantee.
+    #
+    # STRICT enforces that every caller inside the mesh is a known,
+    # certificate-holding service. Unauthenticated calls from outside
+    # the mesh (e.g. a pod without a sidecar) are rejected entirely.
+    #
+    # Prerequisites:
+    #   kubectl label namespace ecommerce istio-injection=enabled
+    #   kubectl rollout restart deployment -n ecommerce
+    # Verify:
+    #   istioctl authn tls-check product-service.ecommerce.svc.cluster.local

@@ -1,0 +1,24 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: product-service
+  namespace: ecommerce
+spec:
+  hosts:
+    - product-service
+  http:
+    - route:
+        - destination:
+            host: product-service
+            subset: stable
+          weight: 80
+        - destination:
+            host: product-service
+            subset: canary
+          weight: 20
+      # Session 14 Canary achieved 80/20 via 8 stable + 2 canary replicas —
+      # an APPROXIMATION (depends on Kubernetes round-robin, not guaranteed).
+      # This VirtualService achieves an EXACT 80/20 split declaratively,
+      # regardless of the number of replicas on each side.
+      # The DestinationRule's subsets (stable/canary) map to pod labels
+      # track=stable and track=canary defined in the deployments.
